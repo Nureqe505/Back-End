@@ -50,3 +50,103 @@ public class AdminController {
         return "redirect:/admin/users";
     }
 }
+
+
+
+</head>
+<body>
+
+<h1>Admin Panel: Users</h1>
+
+<table>
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>Username</th>
+        <th>Role</th>
+        <th>Balance (₸)</th>
+        <th>Status</th>
+        <th>Actions</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="user : ${users}">
+        <td th:text="${user.id}">1</td>
+        <td th:text="${user.username}">user</td>
+        <td th:text="${user.role}">ROLE_USER</td>
+        <td th:text="${userBalances[user.id]}">0.0</td>
+        <td th:text="${user.enabled ? 'Active' : 'Blocked'}">Status</td>
+        <td>
+            <form th:action="@{'/admin/block-user/' + ${user.id}}" method="post" style="display:inline;">
+                <button type="submit" th:if="${user.enabled}">Block</button>
+            </form>
+            <form th:action="@{'/admin/unblock-user/' + ${user.id}}" method="post" style="display:inline;">
+                <button type="submit" th:if="${!user.enabled}">Unblock</button>
+            </form>
+            <form th:action="@{'/admin/delete-user/' + ${user.id}}" method="post" style="display:inline;">
+                <button type="submit" style="background-color: red;">Delete</button>
+            </form>
+        </td>
+    </tr>
+    </tbody>
+</table>
+
+<div class="logout-button">
+    <form th:action="@{/logout}" method="post">
+        <button type="submit">Exit</button>
+    </form>
+</div>
+
+</body>
+</html>
+
+
+@GetMapping("/home")
+public String homePage(Model model, Principal principal) {
+    String username = principal.getName();
+    User user = userService.findUserByUsername(username);
+
+
+    if ("ROLE_ADMIN".equals(user.getRole())) {
+        return "redirect:/admin/users";
+    }
+
+    List<Account> accounts = accountService.findAccountsByUsername(username);
+    model.addAttribute("accounts", accounts);
+    model.addAttribute("username", username);
+    return "home";
+}
+
+public void unblockUserById(Long id) {
+    User user = userRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+    user.setEnabled(true);
+    userRepository.save(user);
+}
+    public void blockUserById(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+        user.setEnabled(false);
+        userRepository.save(user);
+    }
+    
+    public void deleteUserById(Long id) {
+        userRepository.deleteById(id);
+    }
+}
+
+public double calculateTotalBalanceByUsername(String username) {
+    User user = userRepository.findByUsername(username)
+            .orElseThrow(() -> new RuntimeException("User not found: " + username));
+
+    if (user.getCustomer() == null) {
+        return 0.0;
+    }
+
+    List<Account> accounts = accountRepository.findByCustomerId(user.getCustomer().getId());
+
+    return accounts.stream()
+            .mapToDouble(Account::getBalance)
+            .sum();
+}
+
